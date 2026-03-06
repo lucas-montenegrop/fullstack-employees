@@ -1,141 +1,80 @@
-import express from "express";
-const router = express.Router();
+import db from "#db/client";
 
-import {
-  createEmployee,
-  deleteEmployee,
-  getEmployee,
-  getEmployees,
-  updateEmployee,
-} from "#db/queries/employees";
+/** @returns the employee created according to the provided details */
+export async function createEmployee({ name, birthday, salary }) {
+  const sql = `
+  INSERT INTO employees
+    (name, birthday, salary)
+  VALUES
+    ($1, $2, $3)
+  RETURNING *
+  `;
+  const {
+    rows: [employee],
+  } = await db.query(sql, [name, birthday, salary]);
+  return employee;
+}
 
-export default router;
+// === Part 2 ===
 
-/* =========================
-   GET /employees
-   ========================= */
+/** @returns all employees */
+export async function getEmployees() {
+  const sql = `
+  SELECT *
+  FROM employees
+  `;
+  const { rows: employees } = await db.query(sql);
+  return employees;
+}
 
-// when client asks for all employees
-// get all employees from database
-// send them back
-router.get("/", async (req, res, next) => {
-  try {
-    const employees = await getEmployees();
-    res.send(employees);
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @returns the employee with the given id
+ * @returns undefined if employee with the given id does not exist
+ */
+export async function getEmployee(id) {
+  const sql = `
+  SELECT *
+  FROM employees
+  WHERE id = $1
+  `;
+  const {
+    rows: [employee],
+  } = await db.query(sql, [id]);
+  return employee;
+}
 
-/* =========================
-   POST /employees
-   ========================= */
+/**
+ * @returns the updated employee with the given id
+ * @returns undefined if employee with the given id does not exist
+ */
+export async function updateEmployee({ id, name, birthday, salary }) {
+  const sql = `
+  UPDATE employees
+  SET
+    name = $2,
+    birthday = $3,
+    salary = $4
+  WHERE id = $1
+  RETURNING *
+  `;
+  const {
+    rows: [employee],
+  } = await db.query(sql, [id, name, birthday, salary]);
+  return employee;
+}
 
-// read request body
-// if body missing -> send 400
-// if any required field missing -> send 400
-// otherwise create employee
-// send new employee with status 201
-router.post("/", async (req, res, next) => {
-  try {
-    if (!req.body) {
-      return res.status(400).send("Request body required.");
-    }
-
-    const { name, birthday, salary } = req.body;
-
-    if (!name || !birthday || salary === undefined) {
-      return res.status(400).send("Missing required field.");
-    }
-
-    const employee = await createEmployee({ name, birthday, salary });
-    res.status(201).send(employee);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =========================
-   GET /employees/:id
-   ========================= */
-
-// get id from URL params
-// look up employee by id
-// if not found -> send 404
-// otherwise send employee
-router.get("/:id", async (req, res, next) => {
-  try {
-    const employee = await getEmployee(req.params.id);
-
-    if (!employee) {
-      return res.status(404).send("Employee not found.");
-    }
-
-    res.send(employee);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =========================
-   DELETE /employees/:id
-   ========================= */
-
-// get id from URL params
-// try to delete employee
-// if employee not found -> send 404
-// if deleted successfully -> send 204 with no content
-router.delete("/:id", async (req, res, next) => {
-  try {
-    const employee = await deleteEmployee(req.params.id);
-
-    if (!employee) {
-      return res.status(404).send("Employee not found.");
-    }
-
-    res.sendStatus(204);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =========================
-   PUT /employees/:id
-   ========================= */
-
-// get id from URL params
-// check if body exists
-// if body missing -> send 400
-// get fields from body
-// if any required field missing -> send 400
-// update employee in database
-// if employee not found -> send 404
-// otherwise send updated employee with 200
-router.put("/:id", async (req, res, next) => {
-  try {
-    if (!req.body) {
-      return res.status(400).send("Request body required.");
-    }
-
-    const { name, birthday, salary } = req.body;
-
-    if (!name || !birthday || salary === undefined) {
-      return res.status(400).send("Missing required field.");
-    }
-
-    const employee = await updateEmployee({
-      id: req.params.id,
-      name,
-      birthday,
-      salary,
-    });
-
-    if (!employee) {
-      return res.status(404).send("Employee not found.");
-    }
-
-    res.status(200).send(employee);
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @returns the deleted employee with the given id
+ * @returns undefined if employee with the given id does not exist
+ */
+export async function deleteEmployee(id) {
+  const sql = `
+  DELETE FROM employees
+  WHERE id = $1
+  RETURNING *
+  `;
+  const {
+    rows: [employee],
+  } = await db.query(sql, [id]);
+  return employee;
+}
