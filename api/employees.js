@@ -1,80 +1,65 @@
-import db from "#db/client";
+import express from "express";
+const router = express.Router();
+export default router;
 
-/** @returns the employee created according to the provided details */
-export async function createEmployee({ name, birthday, salary }) {
-  const sql = `
-  INSERT INTO employees
-    (name, birthday, salary)
-  VALUES
-    ($1, $2, $3)
-  RETURNING *
-  `;
-  const {
-    rows: [employee],
-  } = await db.query(sql, [name, birthday, salary]);
-  return employee;
+import {
+  createEmployee,
+  deleteEmployee,
+  getEmployee,
+  getEmployees,
+  updateEmployee,
+} from "#db/queries/employees";
+
+router.get("/", async (req, res) => {
+  const employees = await getEmployees ();
+  res.send(employees);
+});
+
+router.post("/", async (req, res) => {
+  if (!req.body) return res.status(400).send("Request body required.");
+
+const { name, birthday, salary } = req.body;
+if (!name || !birthday || !salary) {
+  return res.status (400)
+  .send ("Missing required fields: name, birthday, salary");
 }
 
-// === Part 2 ===
+const employee = await createEmployee({ name, birthday, salary });
+  res.status(201).send(employee);
+});
 
-/** @returns all employees */
-export async function getEmployees() {
-  const sql = `
-  SELECT *
-  FROM employees
-  `;
-  const { rows: employees } = await db.query(sql);
-  return employees;
-}
+router.param("id", async (req, res, next, id) => {
+  const employee = await getEmployee(id);
+  if (!employee) return res.status(404).send("Employee not found.");
 
-/**
- * @returns the employee with the given id
- * @returns undefined if employee with the given id does not exist
- */
-export async function getEmployee(id) {
-  const sql = `
-  SELECT *
-  FROM employees
-  WHERE id = $1
-  `;
-  const {
-    rows: [employee],
-  } = await db.query(sql, [id]);
-  return employee;
-}
 
-/**
- * @returns the updated employee with the given id
- * @returns undefined if employee with the given id does not exist
- */
-export async function updateEmployee({ id, name, birthday, salary }) {
-  const sql = `
-  UPDATE employees
-  SET
-    name = $2,
-    birthday = $3,
-    salary = $4
-  WHERE id = $1
-  RETURNING *
-  `;
-  const {
-    rows: [employee],
-  } = await db.query(sql, [id, name, birthday, salary]);
-  return employee;
-}
+  req.employee = employee;
+  next();
+});
 
-/**
- * @returns the deleted employee with the given id
- * @returns undefined if employee with the given id does not exist
- */
-export async function deleteEmployee(id) {
-  const sql = `
-  DELETE FROM employees
-  WHERE id = $1
-  RETURNING *
-  `;
-  const {
-    rows: [employee],
-  } = await db.query(sql, [id]);
-  return employee;
-}
+router.get("/:id", (req, res) => {
+  res.send(req.employee);
+});
+router.delete("/:id", async (req, res) => {
+  await deleteEmployee(req.employee.id);
+  res.sendStatus(204);
+});
+
+router.put("/:id", async (req, res) => {
+  if (!req.body) return res.status(400).send("Request body required.");
+
+  const { name, birthday, salary } = req.body;
+  if (!name || !birthday || !salary) {
+    return res
+      .status(400)
+      .send("Missing required fields: name, birthday, salary");
+  }
+
+  const employee = await updateEmployee({
+    id: req.employee.id,
+    name,
+    birthday,
+    salary,
+  });
+  res.send(employee);
+});
